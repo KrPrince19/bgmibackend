@@ -8,7 +8,7 @@ const Admin = require("./models/Admin");
 const Joinmatch = require("./models/Joinmatch");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
