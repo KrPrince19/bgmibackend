@@ -83,7 +83,7 @@ app.post("/joinmatches", async (req, res) => {
       firstPlayer,
       secondPlayer,
       thirdPlayer,
-      forthPlayer,
+      fourthPlayer,
       playerEmail,
       playerPassword,
       playerConfirmPassword,
@@ -95,7 +95,7 @@ app.post("/joinmatches", async (req, res) => {
       !firstPlayer ||
       !secondPlayer ||
       !thirdPlayer ||
-      !forthPlayer ||
+      !fourthPlayer ||
       !playerEmail ||
       !playerPassword ||
       !playerConfirmPassword ||
@@ -124,7 +124,7 @@ app.post("/joinmatches", async (req, res) => {
       firstPlayer,
       secondPlayer,
       thirdPlayer,
-      forthPlayer,
+      fourthPlayer,
       playerEmail,
       playerPassword,
       playerMobileNumber,
