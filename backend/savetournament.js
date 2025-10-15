@@ -76,7 +76,7 @@ app.post("/admins", async (req, res) => {
 
 
 /* ------------------------ Join Match ------------------------ */
-app.post("/matchedjoin", async (req, res) => {
+app.post("/joinmatches", async (req, res) => {
   const {
     tournamentName,
     firstPlayer,
