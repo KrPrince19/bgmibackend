@@ -233,7 +233,7 @@ createGetRoute("/upcomingtournament", "upcomingtournament");
 createGetRoute("/topplayer", "topplayer");
 createGetRoute("/tournamentdetail", "tournamentdetail");
 createGetRoute("/admins", "admins");
-createGetRoute("/joinmatches", "joinmatches");
+createGetRoute("/joinmatche", "joinmatche");
 
 
 /* ------------------------ Start Server ------------------------ */
