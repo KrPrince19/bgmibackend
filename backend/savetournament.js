@@ -77,40 +77,46 @@ app.post("/admins", async (req, res) => {
 
 /* ------------------------ Join Match ------------------------ */
 app.post("/joinmatches", async (req, res) => {
-  const {
-    tournamentName,
-    firstPlayer,
-    secondPlayer,
-    thirdPlayer,
-    forthPlayer,
-    playerEmail,
-    playerPassword,
-    playerConfirmPassword,
-    playerMobileNumber,
-  } = req.body;
-
-  if (
-    !tournamentName ||
-    !firstPlayer ||
-    !secondPlayer ||
-    !thirdPlayer ||
-    !forthPlayer ||
-    !playerEmail ||
-    !playerPassword ||
-    !playerConfirmPassword ||
-    !playerMobileNumber
-  ) {
-    return res.status(400).json({ error: "❌ All fields are required." });
-  }
-
-  if (playerPassword !== playerConfirmPassword) {
-    return res.status(400).json({ error: "❌ Passwords do not match." });
-  }
-
   try {
-    const existingUser = await Joinmatch.findOne({ playerEmail });
+    const {
+      tournamentName,
+      firstPlayer,
+      secondPlayer,
+      thirdPlayer,
+      forthPlayer,
+      playerEmail,
+      playerPassword,
+      playerConfirmPassword,
+      playerMobileNumber,
+    } = req.body;
+
+    if (
+      !tournamentName ||
+      !firstPlayer ||
+      !secondPlayer ||
+      !thirdPlayer ||
+      !forthPlayer ||
+      !playerEmail ||
+      !playerPassword ||
+      !playerConfirmPassword ||
+      !playerMobileNumber
+    ) {
+      return res.status(400).json({ error: "❌ All fields are required." });
+    }
+
+    if (playerPassword !== playerConfirmPassword) {
+      return res.status(400).json({ error: "❌ Passwords do not match." });
+    }
+
+    // ✅ Check for duplicate entry (same email + tournament)
+    const existingUser = await Joinmatch.findOne({
+      playerEmail,
+      tournamentName,
+    });
     if (existingUser) {
-      return res.status(409).json({ error: "❌ User with this email already exists." });
+      return res
+        .status(409)
+        .json({ error: "❌ You have already joined this tournament." });
     }
 
     const newJoinmatch = new Joinmatch({
@@ -125,7 +131,6 @@ app.post("/joinmatches", async (req, res) => {
     });
 
     await newJoinmatch.save();
-
     res.status(201).json({ message: "✅ Joined successfully." });
   } catch (err) {
     console.error("❌ Error saving joinmatch:", err);
