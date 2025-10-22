@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 
 app.use(cors({
-  origin: 'https://fragzone.vercel.app', // ✅ Allow only your frontend
+  origin: 'https://fragzone.vercel.app/', // ✅ Allow only your frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
