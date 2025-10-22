@@ -14,6 +14,10 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.use(cors({
+  origin: 'https://fragzone.vercel.app'  // Or '*' for all origins (not recommended in production)
+}));
+
 // MongoDB Connection
 mongoose.connect("mongodb+srv://py242340_db_user:7VeSyeJ9ApvZzAYQ@cluster0.j0zpvjb.mongodb.net/bgmi", {
   useNewUrlParser: true,
