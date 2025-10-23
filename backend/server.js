@@ -14,10 +14,10 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 
 app.use(cors({
-  origin: 'https://fragzone.vercel.app/', // ✅ Allow only your frontend
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
+  origin: ['https://fragzone.vercel.app', 'https://bgmi.vercel.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
+
 
 // MongoDB Connection
 mongoose.connect("mongodb+srv://py242340_db_user:7VeSyeJ9ApvZzAYQ@cluster0.j0zpvjb.mongodb.net/bgmi", {
