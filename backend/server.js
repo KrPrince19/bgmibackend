@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 
 app.use(cors({
-  origin: ['https://fragzone.vercel.app', 'bgmi-scrim-app.vercel.app'],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 
