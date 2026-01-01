@@ -33,15 +33,6 @@ const joinmatchSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
-  playerPassword: {
-    type: String,
-    required: true,
-  },
-  playerMobileNumber: {
-    type: String,
-    required: true,
-    trim: true,
-  },
 }, {
   timestamps: true,
 });

@@ -1,7 +1,10 @@
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
+const http = require("http");
+const { Server } = require("socket.io");
+
 require("dotenv").config();
 
 const Admin = require("./models/Admin");
@@ -10,75 +13,56 @@ const Joinmatch = require("./models/Joinmatch");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+/* ================= MIDDLEWARE ================= */
 app.use(express.json());
-
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE']
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"]
 }));
 
+/* ================= HTTP + SOCKET ================= */
+const server = http.createServer(app);
 
-// MongoDB Connection
-mongoose.connect("mongodb+srv://py242340_db_user:7VeSyeJ9ApvZzAYQ@cluster0.j0zpvjb.mongodb.net/bgmi", {
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"]
+  }
+});
+
+/* ================= SOCKET EVENTS ================= */
+io.on("connection", (socket) => {
+  console.log("🟢 Client connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Client disconnected:", socket.id);
+  });
+});
+
+/* ================= MONGODB ================= */
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
 const db = mongoose.connection;
-db.on("error", (error) => console.error("❌ MongoDB Connection Error:", error));
-db.once("open", () => console.log("✅ Connected to MongoDB"));
 
-/* ------------------------ Admin Registration ------------------------ */
-app.post("/admins", async (req, res) => {
-  const { name, email, password, adminId } = req.body;
+db.on("error", (error) =>
+  console.error("❌ MongoDB Connection Error:", error)
+);
 
-  if (!name || !email || !password || !adminId) {
-    return res.status(400).json({ error: "❌ Name, email, password, and adminId are required." });
-  }
+db.once("open", () =>
+  console.log("✅ Connected to MongoDB")
+);
 
-  // Log for debugging (remove or disable in production)
-  console.log("Received adminId from client:", JSON.stringify(adminId));
-  console.log("process.env.ADMIN_ID:", JSON.stringify(process.env.ADMIN_ID));
-
-  const validAdminId = process.env.ADMIN_ID;
-  if (!validAdminId) {
-    console.error("❌ ADMIN_ID is not set in environment");
-    return res.status(500).json({ error: "Server misconfiguration" });
-  }
-
-  // Normalize both sides: trim and toString
-  const submitted = String(adminId).trim();
-  const valid = String(validAdminId).trim();
-
-  if (submitted !== valid) {
-    console.log("❌ Admin ID mismatch:", { submitted, valid });
-    return res
-      .status(403)
-      .json({ error: "Invalid admin ID. Registration not allowed." });
-  }
-
-  try {
-    const existingAdmin = await Admin.findOne({ email });
-    if (existingAdmin) {
-      return res.status(409).json({ error: "❌ Admin already exists. Please log in." });
-    }
-
-    const newAdmin = new Admin({
-      name,
-      email,
-      password,  // in a real app, hash the password before saving!
-      isVerified: true,
-    });
-    await newAdmin.save();
-
-    res.status(201).json({ message: "✅ Admin registered successfully." });
-  } catch (err) {
-    console.error("❌ Error saving admin:", err);
-    res.status(500).json({ error: "❌ Server error while saving admin." });
-  }
-});
-
+/* ================= SOCKET EMIT HELPER ================= */
+const emitDBUpdate = (event, payload) => {
+  io.emit("db-update", {
+    event,
+    payload,
+    time: new Date()
+  });
+};
 
 /* ------------------------ Join Match ------------------------ */
 app.post("/joinmatches", async (req, res) => {
@@ -90,11 +74,10 @@ app.post("/joinmatches", async (req, res) => {
       thirdPlayer,
       fourthPlayer,
       playerEmail,
-      playerPassword,
-      playerConfirmPassword,
       playerMobileNumber,
     } = req.body;
 
+    /* ---------- BASIC VALIDATION ---------- */
     if (
       !tournamentName ||
       !firstPlayer ||
@@ -102,102 +85,57 @@ app.post("/joinmatches", async (req, res) => {
       !thirdPlayer ||
       !fourthPlayer ||
       !playerEmail ||
-      !playerPassword ||
-      !playerConfirmPassword ||
       !playerMobileNumber
     ) {
-      return res.status(400).json({ error: "❌ All fields are required." });
+      return res.status(400).json({
+        error: "❌ All fields are required.",
+      });
     }
 
-    if (playerPassword !== playerConfirmPassword) {
-      return res.status(400).json({ error: "❌ Passwords do not match." });
+    /* ---------- MOBILE VALIDATION ---------- */
+    if (!/^\d{10}$/.test(playerMobileNumber)) {
+      return res.status(400).json({
+        error: "❌ Mobile number must be exactly 10 digits.",
+      });
     }
 
-    // ✅ Check for duplicate entry (same email + tournament)
+    /* ---------- DUPLICATE CHECK ---------- */
     const existingUser = await Joinmatch.findOne({
-      playerEmail,
+      playerEmail: playerEmail.trim().toLowerCase(),
       tournamentName,
     });
+
     if (existingUser) {
-      return res
-        .status(409)
-        .json({ error: "❌ You have already joined this tournament." });
+      return res.status(409).json({
+        error: "❌ You have already joined this tournament.",
+      });
     }
 
+    /* ---------- SAVE JOIN MATCH ---------- */
     const newJoinmatch = new Joinmatch({
       tournamentName,
       firstPlayer,
       secondPlayer,
       thirdPlayer,
       fourthPlayer,
-      playerEmail,
-      playerPassword,
+      playerEmail: playerEmail.trim().toLowerCase(),
       playerMobileNumber,
     });
 
     await newJoinmatch.save();
-    res.status(201).json({ message: "✅ Joined successfully." });
+
+    // 🔥 REAL-TIME SOCKET UPDATE
+    emitDBUpdate("JOIN_MATCH", newJoinmatch);
+
+    return res.status(201).json({
+      message: "✅ Joined successfully.",
+    });
+
   } catch (err) {
     console.error("❌ Error saving joinmatch:", err);
-    res.status(500).json({ error: "❌ Server error while joining." });
-  }
-});
-
-/* ------------------------ Admin Login ------------------------ */
-app.post("/adminlogin", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: "❌ Email and password are required." });
-  }
-
-  try {
-    const admin = await Admin.findOne({ email });
-
-    if (!admin) {
-      return res.status(404).json({ error: "❌ Admin not found. Please sign up." });
-    }
-
-    if (admin.password !== password) {
-      return res.status(401).json({ error: "❌ Invalid credentials." });
-    }
-
-    admin.isVerified = true;
-    await admin.save();
-
-    res.status(200).json({
-      message: "✅ Login successful",
-      admin: {
-        name: admin.name,
-        email: admin.email,
-        adminId: admin.adminId,
-      },
+    return res.status(500).json({
+      error: "❌ Server error while joining.",
     });
-  } catch (err) {
-    console.error("❌ Admin login error:", err);
-    res.status(500).json({ error: "❌ Server error during login." });
-  }
-});
-
-/* ------------------------ Admin Logout ------------------------ */
-app.post("/logoutadmin", async (req, res) => {
-  const { email } = req.body;
-
-  try {
-    const admin = await Admin.findOneAndUpdate(
-      { email },
-      { isVerified: false },
-      { new: true }
-    );
-
-    if (!admin) {
-      return res.status(404).json({ error: "❌ Admin not found." });
-    }
-
-    res.json({ message: "✅ Admin logged out successfully." });
-  } catch (err) {
-    console.error("❌ Logout error:", err);
-    res.status(500).json({ error: "❌ Failed to log out admin." });
   }
 });
 
@@ -214,6 +152,10 @@ app.post("/tournament", async (req, res) => {
   try {
     const targetCollection = db.collection(collection);
     await targetCollection.insertMany(data);
+
+    // 🔥 REAL-TIME SOCKET UPDATE
+    emitDBUpdate("TOURNAMENT_ADDED", data);
+
     res.status(201).json({ message: "✅ Data saved successfully." });
   } catch (err) {
     console.error("❌ DB error:", err);
@@ -234,19 +176,16 @@ const createGetRoute = (path, collectionName) => {
   });
 };
 
-//get data from DB
+// get data from DB
 createGetRoute("/tournament", "tournament");
-createGetRoute("/mvpplayer", "mvpplayer");
-createGetRoute("/rank", "rank");
+createGetRoute("/leaderboard", "leaderboard");
 createGetRoute("/upcomingscrim", "upcomingscrim");
 createGetRoute("/upcomingtournament", "upcomingtournament");
-createGetRoute("/topplayer", "topplayer");
+createGetRoute("/winner", "winner");
 createGetRoute("/tournamentdetail", "tournamentdetail");
-createGetRoute("/admins", "admins");
 createGetRoute("/joinmatches", "joinmatches");
 
-
-/* ------------------------ Start Server ------------------------ */
-app.listen(PORT, () => {
+/* ================= START SERVER ================= */
+server.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
