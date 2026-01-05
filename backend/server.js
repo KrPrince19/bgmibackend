@@ -7,7 +7,7 @@ const { Server } = require("socket.io");
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.MONGO_URI || 5000;
 
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
