@@ -6,8 +6,6 @@ const { Server } = require("socket.io");
 
 require("dotenv").config();
 
-const Joinmatch = require("./models/Joinmatch");
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -21,12 +19,11 @@ const server = http.createServer(app);
 /* ================= SOCKET.IO ================= */
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ["polling", "websocket"], // 🔥 render safe
+  transports: ["polling", "websocket"], 
 });
 
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
-
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
   });
@@ -34,7 +31,7 @@ io.on("connection", (socket) => {
 
 /* ================= EMIT HELPER ================= */
 const emitDBUpdate = (event, payload = null) => {
-  console.log("📡 SOCKET EMIT:", event); // 🔥 debug proof
+  console.log("📡 SOCKET EMIT:", event);
   io.emit("db-update", {
     event,
     payload,
@@ -50,7 +47,7 @@ mongoose
 
 const db = mongoose.connection;
 
-/* ---------------- INSERT (TOURNAMENT / SCRIM / WINNER / LEADERBOARD) ---------------- */
+/* ---------------- INSERT LOGIC ---------------- */
 app.post("/tournament", async (req, res) => {
   const { collection, data } = req.body;
 
@@ -61,16 +58,19 @@ app.post("/tournament", async (req, res) => {
   try {
     await db.collection(collection).insertMany(data);
 
-    /* 🔥 EXISTING EVENTS (UNCHANGED) */
-    if (collection === "tournament") {
+    // 🔥 Trigger socket events based on which collection was updated
+    if (collection === "tournament" || collection === "upcomingtournament") {
       emitDBUpdate("TOURNAMENT_ADDED", data);
+    }
+
+    if (collection === "joinmatches") {
+      emitDBUpdate("JOIN_MATCH", data);
     }
 
     if (collection === "upcomingscrim") {
       emitDBUpdate("UPCOMING_SCRIM_ADDED", data);
     }
 
-    /* 🔥 NEW EVENTS (REQUIRED FOR REALTIME) */
     if (collection === "winner") {
       emitDBUpdate("WINNER_UPDATED", data);
     }
@@ -105,7 +105,4 @@ get("/winner", "winner");
 get("/tournamentdetail", "tournamentdetail");
 get("/joinmatches", "joinmatches");
 
-/* ================= START ================= */
-server.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
