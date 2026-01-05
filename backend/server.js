@@ -13,7 +13,6 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
 
-/* ================= SERVER ================= */
 const server = http.createServer(app);
 
 /* ================= SOCKET.IO ================= */
@@ -23,15 +22,12 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("🟢 Client connected:", socket.id);
-  socket.on("disconnect", () => {
-    console.log("🔴 Client disconnected:", socket.id);
-  });
+  console.log("🟢 Admin/Client connected:", socket.id);
 });
 
 /* ================= EMIT HELPER ================= */
 const emitDBUpdate = (event, payload = null) => {
-  console.log("📡 SOCKET EMIT:", event);
+  console.log(`📡 BROADCASTING EVENT: ${event}`);
   io.emit("db-update", {
     event,
     payload,
@@ -47,7 +43,7 @@ mongoose
 
 const db = mongoose.connection;
 
-/* ---------------- INSERT LOGIC ---------------- */
+/* ---------------- TOURNAMENT POST ROUTE (FOR ADMIN UPLOADER) ---------------- */
 app.post("/tournament", async (req, res) => {
   const { collection, data } = req.body;
 
@@ -56,53 +52,53 @@ app.post("/tournament", async (req, res) => {
   }
 
   try {
+    // 1. Insert into MongoDB
     await db.collection(collection).insertMany(data);
 
-    // 🔥 Trigger socket events based on which collection was updated
-    if (collection === "tournament" || collection === "upcomingtournament") {
-      emitDBUpdate("TOURNAMENT_ADDED", data);
+    // 2. 🔥 SOCKET LOGIC: Map collections to your frontend events
+    // This ensures when you click "Submit" in AdminUploader, the UI updates
+    const eventMap = {
+      "tournament": "TOURNAMENT_ADDED",
+      "upcomingtournament": "TOURNAMENT_ADDED", // Matches your frontend listener
+      "upcomingscrim": "UPCOMING_SCRIM_ADDED",
+      "winner": "WINNER_UPDATED",
+      "leaderboard": "LEADERBOARD_UPDATED",
+      "tournamentdetail": "DETAIL_UPDATED",
+      "joinmatches": "JOIN_MATCH"
+    };
+
+    const eventToEmit = eventMap[collection];
+    if (eventToEmit) {
+      emitDBUpdate(eventToEmit, data);
     }
 
-    if (collection === "joinmatches") {
-      emitDBUpdate("JOIN_MATCH", data);
-    }
-
-    if (collection === "upcomingscrim") {
-      emitDBUpdate("UPCOMING_SCRIM_ADDED", data);
-    }
-
-    if (collection === "winner") {
-      emitDBUpdate("WINNER_UPDATED", data);
-    }
-
-    if (collection === "leaderboard") {
-      emitDBUpdate("LEADERBOARD_UPDATED", data);
-    }
-
-    res.json({ message: "Saved successfully" });
+    res.json({ message: "Saved successfully and broadcasted to clients" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB error" });
+    console.error("DB Error:", err);
+    res.status(500).json({ error: "Database insertion failed" });
   }
 });
 
-/* ---------------- GET ROUTES ---------------- */
-const get = (path, col) =>
-  app.get(path, async (_, res) => {
+/* ---------------- DYNAMIC GET ROUTES ---------------- */
+const collections = [
+  "tournament", 
+  "upcomingscrim", 
+  "upcomingtournament", 
+  "leaderboard", 
+  "winner", 
+  "tournamentdetail", 
+  "joinmatches"
+];
+
+collections.forEach(col => {
+  app.get(`/${col}`, async (_, res) => {
     try {
       const data = await db.collection(col).find({}).toArray();
       res.json(data);
     } catch (err) {
-      res.status(500).json({ error: "Fetch error" });
+      res.status(500).json({ error: `Fetch error for ${col}` });
     }
   });
-
-get("/tournament", "tournament");
-get("/upcomingscrim", "upcomingscrim");
-get("/upcomingtournament", "upcomingtournament");
-get("/leaderboard", "leaderboard");
-get("/winner", "winner");
-get("/tournamentdetail", "tournamentdetail");
-get("/joinmatches", "joinmatches");
+});
 
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
