@@ -99,6 +99,7 @@ const get = (path, col) =>
 
 get("/tournament", "tournament");
 get("/upcomingscrim", "upcomingscrim");
+get("/upcomingtournament", "upcomingtournament");
 get("/leaderboard", "leaderboard");
 get("/winner", "winner");
 get("/tournamentdetail", "tournamentdetail");
