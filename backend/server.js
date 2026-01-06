@@ -14,17 +14,14 @@ const PORT = process.env.PORT || 5000;
 // ================= MIDDLEWARE =================
 app.use(express.json());
 
-// ✅ STRONG CORS (Render Safe)
+// ✅ CORS (Render + Browser Safe)
 app.use(
   cors({
     origin: "*",
-    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
   })
 );
-
-// ✅ HANDLE PREFLIGHT
-app.options("*", cors());
 
 // ================= SOCKET.IO =================
 const io = new Server(server, {
@@ -32,8 +29,7 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
-  transports: ["polling"], // 🔥 IMPORTANT FOR RENDER
-  allowEIO3: true,
+  transports: ["polling"], // 🔥 IMPORTANT for Render
 });
 
 io.on("connection", (socket) => {
@@ -46,7 +42,7 @@ io.on("connection", (socket) => {
 
 // ================= SOCKET HELPER =================
 const emitDBUpdate = (event, payload = null) => {
-  console.log(`📡 EMIT → ${event}`);
+  console.log(`📡 EMIT EVENT → ${event}`);
   io.emit("db-update", {
     event,
     payload,
@@ -69,23 +65,27 @@ mongoose
 
 const db = mongoose.connection;
 
-// ================= DB GUARD =================
-const ensureDB = (req, res, next) => {
+// ================= DB READY GUARD =================
+const ensureDBReady = (req, res, next) => {
   if (!dbReady) {
     return res.status(503).json({
-      error: "⏳ Database not ready, try again",
+      error: "⏳ Database not ready, retry in a moment",
     });
   }
   next();
 };
 
 // ================= HEALTH CHECK =================
-app.get("/", (_, res) => {
-  res.json({ status: "Backend running 🚀" });
+app.get("/", (req, res) => {
+  res.json({
+    status: "Backend running 🚀",
+    dbReady,
+    time: new Date(),
+  });
 });
 
-// ================= ADMIN UPLOADER (POST) =================
-app.post("/tournament", ensureDB, async (req, res) => {
+// ================= ADMIN UPLOADER =================
+app.post("/tournament", ensureDBReady, async (req, res) => {
   const { collection, data } = req.body;
 
   if (!collection || !Array.isArray(data)) {
@@ -95,9 +95,9 @@ app.post("/tournament", ensureDB, async (req, res) => {
   try {
     await db.collection(collection).insertMany(data);
 
-    console.log("✅ Inserted into:", collection);
+    console.log(`✅ Inserted into collection: ${collection}`);
 
-    // 🔥 EVENT MAP (UNCHANGED)
+    // 🔥 EVENT MAP (UNCHANGED LOGIC)
     const eventMap = {
       tournament: "TOURNAMENT_ADDED",
       upcomingtournament: "TOURNAMENT_ADDED",
@@ -135,12 +135,12 @@ const collections = [
 ];
 
 collections.forEach((col) => {
-  app.get(`/${col}`, ensureDB, async (_, res) => {
+  app.get(`/${col}`, ensureDBReady, async (req, res) => {
     try {
       const data = await db.collection(col).find({}).toArray();
       res.json(data);
     } catch (err) {
-      console.error(`❌ Fetch error (${col})`, err);
+      console.error(`❌ Fetch error (${col}):`, err);
       res.status(500).json({ error: `Fetch failed for ${col}` });
     }
   });
