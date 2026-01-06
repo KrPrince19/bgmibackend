@@ -46,6 +46,8 @@ app.post("/tournament", async (req, res) => {
       upcomingtournament: "TOURNAMENT_ADDED",
       upcomingscrim: "UPCOMING_SCRIM_ADDED",
       joinmatches: "JOIN_MATCH",
+      winner:"WINNER",
+      leaderboard:"LEADERBOARD_ADDED"
     };
 
     const eventToEmit = eventMap[collection];
@@ -58,7 +60,7 @@ app.post("/tournament", async (req, res) => {
 });
 
 // Dynamic Get Routes
-const cols = ["tournament", "upcomingscrim", "upcomingtournament", "joinmatches"];
+const cols = ["tournament", "upcomingscrim", "upcomingtournament", "joinmatches","winner","leaderboard"];
 cols.forEach((col) => {
   app.get(`/${col}`, async (req, res) => {
     try {
