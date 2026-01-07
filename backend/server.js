@@ -66,24 +66,20 @@ app.get("/tournamentdetail/:id", async (req, res) => {
   }
 
   try {
-    const { id } = req.params;
-    
-    // Attempt to find by custom tournamentId string (e.g., "T123")
-    // or by default MongoDB _id
-    let query = { tournamentId: id };
-    let data = await db.collection("tournament").findOne(query);
+    const { id } = req.params; // This will be "deadzone"
+    console.log(`🔍 Searching for tournamentId: ${id}`);
 
-    // Fallback: If not found, check if the ID provided is a valid MongoDB ObjectId
-    if (!data && mongoose.Types.ObjectId.isValid(id)) {
-      data = await db.collection("tournament").findOne({ _id: new mongoose.Types.ObjectId(id) });
+    // Specifically query the field 'tournamentId'
+    const data = await db.collection("tournament").findOne({ tournamentId: id });
+
+    if (!data) {
+      return res.status(404).json({ error: `Tournament with ID '${id}' not found` });
     }
-
-    if (!data) return res.status(404).json({ error: "Tournament details not found" });
     
     res.json(data);
   } catch (err) {
-    console.error(`❌ Fetch failed for tournamentdetail ${req.params.id}:`, err);
-    res.status(500).json({ error: "Fetch failed" });
+    console.error(`❌ Fetch failed for ${req.params.id}:`, err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
