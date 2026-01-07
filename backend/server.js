@@ -57,22 +57,50 @@ app.post("/tournament", async (req, res) => {
   }
 });
 
-// Dynamic Get Routes with improved error logging
+/** * NEW: Fetch Specific Tournament Details 
+ * Route: GET /tournamentdetail/:id
+ */
+app.get("/tournamentdetail/:id", async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: "Database not ready yet" });
+  }
+
+  try {
+    const { id } = req.params;
+    
+    // Attempt to find by custom tournamentId string (e.g., "T123")
+    // or by default MongoDB _id
+    let query = { tournamentId: id };
+    let data = await db.collection("tournament").findOne(query);
+
+    // Fallback: If not found, check if the ID provided is a valid MongoDB ObjectId
+    if (!data && mongoose.Types.ObjectId.isValid(id)) {
+      data = await db.collection("tournament").findOne({ _id: new mongoose.Types.ObjectId(id) });
+    }
+
+    if (!data) return res.status(404).json({ error: "Tournament details not found" });
+    
+    res.json(data);
+  } catch (err) {
+    console.error(`❌ Fetch failed for tournamentdetail ${req.params.id}:`, err);
+    res.status(500).json({ error: "Fetch failed" });
+  }
+});
+
+// Dynamic Get Routes for general lists
 const cols = ["tournament", "upcomingscrim", "upcomingtournament", "joinmatches", "winner", "leaderboard"];
 
 cols.forEach((col) => {
   app.get(`/${col}`, async (req, res) => {
-    // 1. Check if DB is actually connected
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ error: "Database not ready yet" });
     }
 
     try {
-      // 2. Fetch data
       const data = await db.collection(col).find({}).toArray();
       res.json(data);
     } catch (err) {
-      console.error(`❌ Fetch failed for ${col}:`, err); // This will tell you the EXACT error
+      console.error(`❌ Fetch failed for ${col}:`, err);
       res.status(500).json({ error: `Fetch failed for ${col}` });
     }
   });
